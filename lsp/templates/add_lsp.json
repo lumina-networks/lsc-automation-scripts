@@ -1,0 +1,57 @@
+{
+  "network-topology-pcep:input": {
+    "network-topology-pcep:network-topology-ref": "/network-topology:network-topology/network-topology:topology[network-topology:topology-id='pcep-topology']",
+    "network-topology-pcep:name": "{{lsp-name}}",
+    "network-topology-pcep:node": "pcc://{{node-id}}",
+    "network-topology-pcep:arguments": {
+      "network-topology-pcep:lspa": {
+        "network-topology-pcep:hold-priority": "{{hold-priority}}",
+        "network-topology-pcep:setup-priority": "{{setup-priority}}",
+        "network-topology-pcep:processing-rule": "false",
+        "network-topology-pcep:ignore": "false",
+        "network-topology-pcep:exclude-any": "0",
+        "network-topology-pcep:label-recording-desired": "false"
+      },
+      "network-topology-pcep:odl-pcep-ietf-stateful07:path-setup-type": {
+        "network-topology-pcep:odl-pcep-ietf-stateful07:pst": "0"
+      },
+      "network-topology-pcep:odl-pcep-ietf-stateful07:lsp": {
+        "network-topology-pcep:odl-pcep-ietf-stateful07:administrative": "true",
+        "network-topology-pcep:odl-pcep-ietf-stateful07:ignore": "false",
+        "network-topology-pcep:odl-pcep-ietf-stateful07:delegate": "true",
+        "network-topology-pcep:odl-pcep-ietf-stateful07:operational": "up"
+      },
+      "network-topology-pcep:reoptimization-bandwidth": {
+        "network-topology-pcep:processing-rule": "false",
+        "network-topology-pcep:bandwidth": "SRiWgA==",
+        "network-topology-pcep:ignore": "false"
+      },
+      "network-topology-pcep:endpoints-obj": {
+        "ipv4": {
+          "network-topology-pcep:source-ipv4-address": "{{source-ipv4-address}}",
+          "network-topology-pcep:destination-ipv4-address": "{{destination-ipv4-address}}"
+        },
+        "network-topology-pcep:processing-rule": "false",
+        "network-topology-pcep:ignore": "false"
+      },
+      "network-topology-pcep:bandwidth": {
+        "network-topology-pcep:processing-rule": "false",
+        "network-topology-pcep:bandwidth": "SZiWgA==",
+        "network-topology-pcep:ignore": "false"
+      },
+      "network-topology-pcep:ero": {
+        "network-topology-pcep:processing-rule": "false",
+        "network-topology-pcep:ignore": "false",
+        "network-topology-pcep:subobject": [
+          {
+            "network-topology-pcep:loose": "false",
+            "ip-prefix": {
+              "network-topology-pcep:ip-prefix": "{{ero-hops}}"
+            }
+          }
+        ]
+      },
+      "network-topology-pcep:metadata": {}
+    }
+  }
+}
