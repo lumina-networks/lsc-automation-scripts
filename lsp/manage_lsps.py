@@ -87,8 +87,9 @@ def make_body(templateFile, userData, type="json"):
         ret = json.loads(open(templateFile, 'r'))
     elif type == "xml":
         # @TODO add support for getting the xml template file.
-    else
-        print "ERROR:::Only JSON or XML type supported!  Unsupported type=" + type + "\n"
+        print ("")
+    else:
+        print ("ERROR:::Only JSON or XML type supported!  Unsupported type=" + type + "\n")
         return None
     
     # Iterate over the template and substitute user data values
