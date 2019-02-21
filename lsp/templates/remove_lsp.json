@@ -1,0 +1,7 @@
+{
+  "network-topology-pcep:input": {
+    "network-topology-pcep:network-topology-ref": "/network-topology:network-topology/network-topology:topology[network-topology:topology-id='pcep-topology']",
+    "network-topology-pcep:name": "{{lsp-name}}",
+    "network-topology-pcep:node": "pcc://{{node-id}}"
+  }
+}

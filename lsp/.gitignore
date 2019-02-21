@@ -1,0 +1,9 @@
+# Ignore the lsc_env.py file - It is local only! - sample found in templates/lsc_env.py
+/lsc_env.py
+
+# Ignore everything in data dir and any subdirs
+data/**/*
+
+# But not these files...
+!data/lsps_multiple.csv
+!data/lsps_single.csv

@@ -7,7 +7,7 @@ Lumina NetDev Environment Parameters:
 
 data_type = "json" #Valid Values=(json,xml)
 LSC_PARAMS = {
-    "host": "http://192.168.86.243:8181",
+    "host": "http://localhost:8181",
     "username": 'admin',
     "password": 'admin',
     "type": data_type,

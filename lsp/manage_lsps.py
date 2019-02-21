@@ -7,11 +7,14 @@ Lumina NetDev Automation Script:
     running this script.
 """
 
-import requests
+import sys
+sys.path.append('../Lib')
+import rest
 import lsc_env
 import csv
 import json
-import base64
+import xmltodict
+import re
 import dpath
 from StdSuites.Table_Suite import row
 # https://github.com/akesterson/dpath-python
@@ -21,33 +24,15 @@ from StdSuites.Table_Suite import row
 lspAdd = "/restconf/operations/network-topology-pcep:add-lsp"
 lspUpdate = "/restconf/operations/network-topology-pcep:update-lsp"
 lspRemove = "/restconf/operations/network-topology-pcep:remove-lsp"
+getBgpTopology = "/restconf/operational/network-topology:network-topology/"
 lspOperation = ""
 uri = ""
-postMestod = "POST"
+method = ""
+postMethod = "POST"
 getMethod = "GET"
+deleteMethod = "DELETE"
 timeout = 2
 
-
-###############################################################################
-
-def invoke_rest(uri, method, body, timeout=5):
-    """
-    Invoke arbitrary REST call and return result
-    :param uri:  URI to call
-    :param method: HTTP method
-    :param body: HTTP body
-    :param timeout: Rest call timeout in seconds. Defaults to 5
-    :return: API call output
-    """
-    print ('[REST] %s %s\n%s' % (method, uri, body))
-    try:
-        return requests.request(method=method, url=uri, headers={
-            'Content-Type': lsc_env.LSC_PARAMS['contenttype'],
-            'Accept': lsc_env.LSC_PARAMS['accept'],
-            'Authorization': 'Basic ' + base64.b64encode('%s:%s' % (lsc_env.LSC_PARAMS['username'], lsc_env.LSC_PARAMS['password']))
-        }, data=body, timeout=timeout).json()
-    except Exception:
-        return None
 
 ###############################################################################
 
@@ -65,29 +50,46 @@ def parse_csv(file):
     ret = []
     for row in data:
         ret.append(row)
-    
-    # Parse the CSV into JSON
-    #ret = json.dumps( [ row for row in data_in ] )
-    
-    print "DEBUG:::Returning data set=" + ret
+        
+    #print "DEBUG:::Returning data set={}".format(ret)
     return ret
+
 
 ###############################################################################
 
 def make_body(templateFile, userData, type="json"):
     """
     Parse the input csv file into a Python data dictionary.
-    :param templateFile:  Full file path, name and extension - ex /opt/app/script/add_lsp.json
-    :param userData: The dictionary of data to substitute into the template data
-    :param type: The return data format json or xml.
-    :return: JSON request body/payload
+    
+    Parameters
+    ----------
+    templateFile : str
+        Full file path, name and extension - ex templates/add_lsp.json
+    userData : dict
+        The dictionary of user data for substitution into the template file data
+    type : {'json', 'xml'}, optional
+        The templateFile data format json or xml. Defaults to ``json``
+
+    Returns
+    -------
+    tpltDataStr : dict
+        Request body/payload as Dictionary
+    
+    Examples
+    --------
+    >>> row = {'index': '1', 'hold-priority': '2', 'ero-hops': '10.1.2.1/32|10.2.3.1/32', 'source-ipv4-address': '1.1.1.1', 'lsp-name': 'Test-lsp-1', 'setup-priority': '0', 'operation': 'add', 'destination-ipv4-address': '3.3.3.3', 'node-id': '192.168.1.245'}
+    >>> body = make_body('templates/add_lsp.xml', row, lsc_env.LSC_PARAMS['type'])
+    >>> body
+    {"network-topology-pcep:input": {"network-topology-pcep:arguments": {"network-topology-pcep:lspa": {"network-topology-pcep:setup-priority": "0", "network-topology-pcep:processing-rule": "false", "network-topology-pcep:ignore": "false", "network-topology-pcep:hold-priority": "2"}, "network-topology-pcep:ero": {"network-topology-pcep:processing-rule": "false", "network-topology-pcep:ignore": "false", "network-topology-pcep:subobject": [{"ip-prefix": {"network-topology-pcep:ip-prefix": "10.1.2.1/32"}, "network-topology-pcep:loose": "false"},{"ip-prefix": {"network-topology-pcep:ip-prefix": "10.2.3.1/32"}, "network-topology-pcep:loose": "false"}]}, "network-topology-pcep:bandwidth": {"network-topology-pcep:processing-rule": "false", "network-topology-pcep:ignore": "false", "network-topology-pcep:bandwidth": "SZiWgA=="}, "network-topology-pcep:odl-pcep-ietf-stateful07:lsp": {"network-topology-pcep:odl-pcep-ietf-stateful07:delegate": "true", "network-topology-pcep:odl-pcep-ietf-stateful07:administrative": "true", "network-topology-pcep:odl-pcep-ietf-stateful07:processing-rule": "false", "network-topology-pcep:odl-pcep-ietf-stateful07:ignore": "false", "network-topology-pcep:odl-pcep-ietf-stateful07:operational": "up"}, "network-topology-pcep:endpoints-obj": {"network-topology-pcep:processing-rule": "false", "network-topology-pcep:ignore": "false", "ipv4": {"network-topology-pcep:destination-ipv4-address": "3.3.3.3", "network-topology-pcep:source-ipv4-address": "1.1.1.1"}}}, "network-topology-pcep:network-topology-ref": "/network-topology:network-topology/network-topology:topology[network-topology:topology-id='pcep-topology']", "network-topology-pcep:name": "Test-lsp-1", "network-topology-pcep:node": "pcc://192.168.1.245"}}
     """
     # Get the template file based on type:
     if type == "json":
-        ret = json.loads(open(templateFile, 'r'))
+        tpltData = json.load(open(templateFile, 'r'))
+        #print "DEBUG:::templateFile data={0}".format(tpltData)
     elif type == "xml":
         # @TODO add support for getting the xml template file.
-        print ("")
+        tpltData = xmltodict.parse(open(templateFile, 'r'))
+        #print "DEBUG:::XML templateFile data={0}".format(tpltData)
     else:
         print ("ERROR:::Only JSON or XML type supported!  Unsupported type=" + type + "\n")
         return None
@@ -96,31 +98,116 @@ def make_body(templateFile, userData, type="json"):
     # Template contains key value pairs in xml or json format where:
     #    key --> matches YANG model
     #    value --> matches PostMan variable sub format {{var_name}}
-    for row in ret:
-        print ("DEBUG:::Current row=" + row + "\n")
-        # @TODO need a regex to look for {{var_name}}
+    tpltDataStr = json.dumps(tpltData)
+    #print "DEBUG:::Before Subs tpltDataStr={0}".format(tpltDataStr)
+    
+    for uKey,uVal in userData.items():
+        #print "DEBUG:::key={0} value={1}".format(uKey,uVal)
+        pattern = re.compile('{{' + uKey + '}}')
+        #print "DEBUG:::regex match={0}".format(pattern.search(tpltDataStr))
         
+        if uKey == "ero-hops":
+            #Special Case for Ero Hops - the replacement string is type dependent
+            # NOTE: The xml does not import with necessary array brackets, so
+            #       handling this with the pre/post Char values.
+            if type == 'xml':
+                replaceStr = '{"loose": "false", "ip-prefix": {"ip-prefix": "{{ero-hops}}"}}'
+                preChar = "["
+                postChar = "]"
+            else:
+                replaceStr = '{"ip-prefix": {"network-topology-pcep:ip-prefix": "{{ero-hops}}"}, "network-topology-pcep:loose": "false"}'
+                preChar = ""
+                postChar = ""
+            
+            # Generate the appropriate number of json subobjects and set each
+            # route hop ip address.
+            eroHops = uVal.split("|")
+            subObject = preChar
+            for eroHop in eroHops:
+                # Generate the appropriate number of subobjects and set each
+                # route hop ip address.
+                if subObject != preChar:
+                    subObject += ","
+                subObject += replaceStr
+                subObject = re.sub(pattern, eroHop, subObject)
+                #print "DEBUG:::Current subObject={0}".format(subObject)
+            
+            # Append the postChar
+            subObject += postChar
+            
+            # Now replace the original template subobject with full ERO
+            pattern = re.compile(replaceStr)
+            #pattern.replace("{", "\{").replace("}", "\}")
+            #print "DEBUG:::pattern={0}".format(pattern)
+            tpltDataStr = pattern.sub(subObject, tpltDataStr)
+        else:
+            # Use regex to look for {{var_name}}
+            #print "DEBUG:::regex match={0}".format(pattern.search(tpltDataStr))
+            if pattern.search(tpltDataStr) != None:
+                tpltDataStr = pattern.sub(uVal, tpltDataStr)
+    
+    #print "DEBUG:::After Subs templateJsonStr={0}".format(tpltDataStr)
     
     # Return the body:
-    return ret
+    if type == "xml":
+        tpltDataStr = xmltodict.unparse(json.loads(tpltDataStr), pretty=True)
+
+    #print "DEBUG:::Return={0}".format(tpltDataStr)
+    return tpltDataStr
+
 
 ###############################################################################
 
+def manage_lsps():
+    inputData = parse_csv(lsc_env.LSC_PARAMS['lspinputfile'])
+    for i, row in enumerate(inputData):
+        #print "DEBUG:::Row number={0} and data={1}".format(i,row)
+        lspOperation = row['operation']
+    
+        if lspOperation == "add":
+            method = postMethod
+            uri = lsc_env.LSC_PARAMS['host'] + lspAdd
+            body = make_body(lsc_env.LSC_PARAMS['addlsptplt'], row, lsc_env.LSC_PARAMS['type'])
+        elif lspOperation == "update":
+            method = postMethod
+            uri = lsc_env.LSC_PARAMS['host'] + lspUpdate
+            body = make_body(lsc_env.LSC_PARAMS['updatelsptplt'], row, lsc_env.LSC_PARAMS['type'])
+        elif lspOperation == "remove":
+            method = postMethod
+            uri = lsc_env.LSC_PARAMS['host'] + lspRemove
+            body = make_body(lsc_env.LSC_PARAMS['removelsptplt'], row, lsc_env.LSC_PARAMS['type'])
+        else:
+            print "ERROR: Invalid LSP Operation={0} on row={1}".format(lspOperation,row)
+            exit
+        
+        #print "DEBUG:::URI={0}; method={1}; body={2}".format(uri, method, body)
+        request = rest.invoke_rest(uri, method, body, lsc_env.LSC_PARAMS['username'], lsc_env.LSC_PARAMS['password'], lsc_env.LSC_PARAMS['type'], timeout)
+        print "INFO:::Status Code={0}".format(request.status_code)
+        #print "DEBUG:::Text request={0}".format(request.text)
+        #print "DEBUG:::Content request={0}".format(request.content)
+        
+        if (request != None):
+            #if ('status_code' in request and request.status_code < 300):
+            if (request.status_code < 300):
+                print "INFO:::SUCCESS - Response content={0}".format(request.content)
+            else:
+                print "ERROR:::request={0}".format(request.content)
+        else:
+            print "ERROR:::Unknown error encountered for method={0}, uri={1}".format(method, uri)
 
+###############################################################################
 
-if lspOperation == "add":
-    uri = lsc_env.LSC_PARAMS['host'] + lspAdd
-    userData = parse_csv(lsc_env.LSC_PARAMS['lspinputfile'])
-    body = make_body(lsc_env.LSC_PARAMS['addlsptplt'], userData, lsc_env.LSC_PARAMS['type'])
-    invoke_rest(uri, postMethod, body, timeout)
-elif lspOperation == "update":
-    uri = lsc_env.LSC_PARAMS['host'] + lspUpdate
-    invoke_rest(uri, postMethod, body, timeout)
-elif lspOperation == "remove":
-    uri = lsc_env.LSC_PARAMS['host'] + lspRemove
-    invoke_rest(uri, postMethod, body, timeout)
-else:
-    print ("ERROR: Invalid LSP Operation=" + lspOperation)
-    exit
+if __name__ == "__main__":
+    manage_lsps()
 
-invoke_rest(uri, postMethod, body)
+# SOME TESTS:
+#Get the bgp topology
+#uri = lsc_env.LSC_PARAMS['host'] + getBgpTopology
+#request = rest.invoke_rest(uri, getMethod, '', lsc_env.LSC_PARAMS['username'], lsc_env.LSC_PARAMS['password'], lsc_env.LSC_PARAMS['type'], timeout)
+#print "DEBUG:::BGP Topology request={0}".format(request.content)
+
+# TEST BAD URI REQUEST
+#uri = "/restconf/"
+#request = rest.invoke_rest(uri, getMethod, '', lsc_env.LSC_PARAMS['username'], lsc_env.LSC_PARAMS['password'])
+#print "DEBUG:::TEST request={0}".format(request)
+

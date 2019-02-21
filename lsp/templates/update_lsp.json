@@ -17,6 +17,11 @@
         "network-topology-pcep:odl-pcep-ietf-stateful07:delegate": "true",
         "network-topology-pcep:odl-pcep-ietf-stateful07:operational": "up"
       },
+      "network-topology-pcep:reoptimization-bandwidth": {
+        "network-topology-pcep:processing-rule": "false",
+        "network-topology-pcep:ignore": "false",
+        "network-topology-pcep:bandwidth": "SRiWgA=="
+      },
       "network-topology-pcep:endpoints-obj": {
         "ipv4": {
           "network-topology-pcep:source-ipv4-address": "{{source-ipv4-address}}",
@@ -41,7 +46,8 @@
             }
           }
         ]
-      }
+      },
+      "network-topology-pcep:metadata": {}
     }
   }
 }
